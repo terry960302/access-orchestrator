@@ -1,11 +1,11 @@
 package com.pandaterry.access_orchestrator.core.policy;
 
-import org.springframework.stereotype.Component;
+
+import com.pandaterry.access_orchestrator.core.resource.FieldName;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-
-@Component
+import java.util.concurrent.CopyOnWriteArrayList;
 public class DefaultFieldPolicyManager implements FieldPolicyManager {
     private final Map<String, List<FieldPolicy>> fieldPolicies = new ConcurrentHashMap<>();
 
@@ -28,12 +28,12 @@ public class DefaultFieldPolicyManager implements FieldPolicyManager {
                 .description(policy.getDescription())
                 .build() : policy;
 
-        fieldPolicies.computeIfAbsent(policyWithEffect.getResourceType(), k -> new ArrayList<>())
+        fieldPolicies.computeIfAbsent(policyWithEffect.getResourceType(), k -> new CopyOnWriteArrayList<>())
                 .add(policyWithEffect);
     }
 
     @Override
-    public void removeFieldPolicy(String resourceType, String fieldName) {
+    public void removeFieldPolicy(String resourceType, FieldName fieldName) {
         if (resourceType == null || fieldName == null) {
             throw new IllegalArgumentException("Resource type and field name cannot be null");
         }
@@ -47,7 +47,7 @@ public class DefaultFieldPolicyManager implements FieldPolicyManager {
     }
 
     @Override
-    public FieldPolicy getFieldPolicy(String resourceType, String fieldName) {
+    public FieldPolicy getFieldPolicy(String resourceType, FieldName fieldName) {
         if (resourceType == null || fieldName == null) {
             throw new IllegalArgumentException("Resource type and field name cannot be null");
         }

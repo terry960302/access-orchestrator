@@ -1,12 +1,13 @@
 package com.pandaterry.access_orchestrator.core.policy;
 
+import com.pandaterry.access_orchestrator.core.attribute.AttributeId;
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
 public class Condition {
-    private String attributeId;
+    private AttributeId attributeId;
     private Operator operator;
     private Object value;
     private final LogicalOperator logicalOperator;

@@ -2,9 +2,15 @@ package com.pandaterry.access_orchestrator;
 
 import com.pandaterry.access_orchestrator.core.attribute.Attribute;
 import com.pandaterry.access_orchestrator.core.attribute.AttributeProvider;
+import com.pandaterry.access_orchestrator.core.attribute.AttributeId;
+import com.pandaterry.access_orchestrator.core.attribute.AttributeValue;
 import com.pandaterry.access_orchestrator.core.context.Context;
 import com.pandaterry.access_orchestrator.core.context.ContextManager;
 import com.pandaterry.access_orchestrator.core.policy.*;
+import com.pandaterry.access_orchestrator.core.resource.FieldName;
+import com.pandaterry.access_orchestrator.core.resource.SubjectId;
+import com.pandaterry.access_orchestrator.core.resource.ResourceId;
+import com.pandaterry.access_orchestrator.core.resource.Action;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,12 +33,14 @@ class DefaultPolicyEvaluatorTest {
         private AttributeProvider attributeProvider;
         @Mock
         private FieldPolicyManager fieldPolicyManager;
+        @Mock
+        private PolicyRepository policyRepository;
 
         private DefaultPolicyEvaluator evaluator;
 
         @BeforeEach
         void setUp() {
-                evaluator = new DefaultPolicyEvaluator(contextManager, attributeProvider, fieldPolicyManager);
+                evaluator = new DefaultPolicyEvaluator(contextManager, attributeProvider, fieldPolicyManager, policyRepository);
         }
 
         @Test
@@ -57,18 +65,18 @@ class DefaultPolicyEvaluatorTest {
                                 .effect(Policy.Effect.ALLOW)
                                 .conditions(List.of(
                                                 Condition.builder()
-                                                                .attributeId("role")
+                                                                .attributeId(new AttributeId("role"))
                                                                 .operator(Condition.Operator.EQUALS)
                                                                 .value("ADMIN")
                                                                 .build()))
                                 .build();
                 Context context = createTestContextWithRole("ADMIN");
                 Attribute attribute = Attribute.builder()
-                                .id("role")
+                                .id(new AttributeId("role"))
                                 .source(Attribute.Source.SUBJECT)
                                 .build();
 
-                when(attributeProvider.getAttribute("role")).thenReturn(attribute);
+                when(attributeProvider.getAttribute(new AttributeId("role"))).thenReturn(attribute);
 
                 // when
                 Policy.Effect result = evaluator.evaluate(policy, context);
@@ -84,18 +92,18 @@ class DefaultPolicyEvaluatorTest {
                                 .effect(Policy.Effect.ALLOW)
                                 .conditions(List.of(
                                                 Condition.builder()
-                                                                .attributeId("role")
+                                                                .attributeId(new AttributeId("role"))
                                                                 .operator(Condition.Operator.EQUALS)
                                                                 .value("ADMIN")
                                                                 .build()))
                                 .build();
                 Context context = createTestContext();
                 Attribute attribute = Attribute.builder()
-                                .id("role")
+                                .id(new AttributeId("role"))
                                 .source(Attribute.Source.SUBJECT)
                                 .build();
 
-                when(attributeProvider.getAttribute("role")).thenReturn(attribute);
+                when(attributeProvider.getAttribute(new AttributeId("role"))).thenReturn(attribute);
 
                 // when
                 Policy.Effect result = evaluator.evaluate(policy, context);
@@ -105,14 +113,47 @@ class DefaultPolicyEvaluatorTest {
         }
 
         @Test
+        void evaluate_WithOrOperator_ShouldReturnPolicyEffectWhenAnyConditionMet() {
+                // given
+                Policy policy = Policy.builder()
+                                .effect(Policy.Effect.ALLOW)
+                                .conditions(List.of(
+                                                Condition.builder()
+                                                                .attributeId(new AttributeId("role"))
+                                                                .operator(Condition.Operator.EQUALS)
+                                                                .value("USER")
+                                                                .build(),
+                                                Condition.builder()
+                                                                .attributeId(new AttributeId("role"))
+                                                                .operator(Condition.Operator.EQUALS)
+                                                                .value("ADMIN")
+                                                                .logicalOperator(Condition.LogicalOperator.OR)
+                                                                .build()))
+                                .build();
+                Context context = createTestContextWithRole("ADMIN");
+                Attribute attribute = Attribute.builder()
+                                .id(new AttributeId("role"))
+                                .source(Attribute.Source.SUBJECT)
+                                .build();
+
+                when(attributeProvider.getAttribute(new AttributeId("role"))).thenReturn(attribute);
+
+                // when
+                Policy.Effect result = evaluator.evaluate(policy, context);
+
+                // then
+                assertThat(result).isEqualTo(Policy.Effect.ALLOW);
+        }
+
+        @Test
         void canAccessField_WhenNoPolicy_ShouldReturnTrue() {
                 // given
                 Context context = createTestContext();
-                when(contextManager.getContext(any(), any(), any())).thenReturn(context);
-                when(fieldPolicyManager.getFieldPolicy(any(), any())).thenReturn(null);
+                when(contextManager.getContext(any(SubjectId.class), any(ResourceId.class), any(Action.class))).thenReturn(context);
+                when(fieldPolicyManager.getFieldPolicy(any(), any(FieldName.class))).thenReturn(null);
 
                 // when
-                boolean result = evaluator.canAccessField("subject1", "resource1", "field1");
+                boolean result = evaluator.canAccessField(new SubjectId("subject1"), new ResourceId("resource1"), new FieldName("field1"));
 
                 // then
                 assertThat(result).isTrue();
@@ -124,15 +165,15 @@ class DefaultPolicyEvaluatorTest {
                 Context context = createTestContext();
                 FieldPolicy fieldPolicy = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("field1")
+                                .fieldName(new FieldName("field1"))
                                 .accessible(true)
                                 .build();
 
-                when(contextManager.getContext(any(), any(), any())).thenReturn(context);
-                when(fieldPolicyManager.getFieldPolicy(any(), any())).thenReturn(fieldPolicy);
+                when(contextManager.getContext(any(SubjectId.class), any(ResourceId.class), any(Action.class))).thenReturn(context);
+                when(fieldPolicyManager.getFieldPolicy(any(), any(FieldName.class))).thenReturn(fieldPolicy);
 
                 // when
-                boolean result = evaluator.canAccessField("subject1", "resource1", "field1");
+                boolean result = evaluator.canAccessField(new SubjectId("subject1"), new ResourceId("resource1"), new FieldName("field1"));
 
                 // then
                 assertThat(result).isTrue();
@@ -144,38 +185,124 @@ class DefaultPolicyEvaluatorTest {
                 Context context = createTestContext();
                 FieldPolicy fieldPolicy = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("field1")
+                                .fieldName(new FieldName("field1"))
                                 .accessible(false)
                                 .build();
 
-                when(contextManager.getContext(any(), any(), any())).thenReturn(context);
-                when(fieldPolicyManager.getFieldPolicy(any(), any())).thenReturn(fieldPolicy);
+                when(contextManager.getContext(any(SubjectId.class), any(ResourceId.class), any(Action.class))).thenReturn(context);
+                when(fieldPolicyManager.getFieldPolicy(any(), any(FieldName.class))).thenReturn(fieldPolicy);
 
                 // when
-                boolean result = evaluator.canAccessField("subject1", "resource1", "field1");
+                boolean result = evaluator.canAccessField(new SubjectId("subject1"), new ResourceId("resource1"), new FieldName("field1"));
+
+                // then
+                assertThat(result).isFalse();
+        }
+
+        @Test
+        void canAccessField_WithOrCondition_ShouldReturnTrueWhenAnyConditionMet() {
+                // given
+                Context context = createTestContext();
+                FieldPolicy fieldPolicy = FieldPolicy.builder()
+                                .resourceType("Document")
+                                .fieldName(new FieldName("field1"))
+                                .conditions(List.of(
+                                                Condition.builder()
+                                                                .attributeId(new AttributeId("role"))
+                                                                .operator(Condition.Operator.EQUALS)
+                                                                .value("ADMIN")
+                                                                .build(),
+                                                Condition.builder()
+                                                                .attributeId(new AttributeId("role"))
+                                                                .operator(Condition.Operator.EQUALS)
+                                                                .value("USER")
+                                                                .logicalOperator(Condition.LogicalOperator.OR)
+                                                                .build()))
+                                .accessible(true)
+                                .build();
+
+                when(contextManager.getContext(any(SubjectId.class), any(ResourceId.class), any(Action.class))).thenReturn(context);
+                when(fieldPolicyManager.getFieldPolicy(any(), any(FieldName.class))).thenReturn(fieldPolicy);
+                Attribute attribute = Attribute.builder().id(new AttributeId("role")).source(Attribute.Source.SUBJECT).build();
+                when(attributeProvider.getAttribute(new AttributeId("role"))).thenReturn(attribute);
+
+                // when
+                boolean result = evaluator.canAccessField(new SubjectId("subject1"), new ResourceId("resource1"), new FieldName("field1"));
+
+                // then
+                assertThat(result).isTrue();
+        }
+
+        @Test
+        void canAccess_WhenPolicyAllows_ShouldReturnTrue() {
+                // given
+                Context context = createTestContextWithRole("ADMIN");
+                Policy policy = Policy.builder()
+                                .effect(Policy.Effect.ALLOW)
+                                .conditions(List.of(
+                                                Condition.builder()
+                                                                .attributeId(new AttributeId("role"))
+                                                                .operator(Condition.Operator.EQUALS)
+                                                                .value("ADMIN")
+                                                                .build()))
+                                .build();
+
+                when(contextManager.getContext(any(SubjectId.class), any(ResourceId.class), any())).thenReturn(context);
+                when(policyRepository.getPolicies(any(), any(Action.class))).thenReturn(List.of(policy));
+                Attribute attribute = Attribute.builder().id(new AttributeId("role")).source(Attribute.Source.SUBJECT).build();
+                when(attributeProvider.getAttribute(new AttributeId("role"))).thenReturn(attribute);
+
+                // when
+                boolean result = evaluator.canAccess(new SubjectId("subject1"), new ResourceId("resource1"), Action.READ);
+
+                // then
+                assertThat(result).isTrue();
+        }
+
+        @Test
+        void canAccess_WhenPolicyDenies_ShouldReturnFalse() {
+                // given
+                Context context = createTestContextWithRole("USER");
+                Policy policy = Policy.builder()
+                                .effect(Policy.Effect.DENY)
+                                .conditions(List.of(
+                                                Condition.builder()
+                                                                .attributeId(new AttributeId("role"))
+                                                                .operator(Condition.Operator.EQUALS)
+                                                                .value("USER")
+                                                                .build()))
+                                .build();
+
+                when(contextManager.getContext(any(SubjectId.class), any(ResourceId.class), any())).thenReturn(context);
+                when(policyRepository.getPolicies(any(), any(Action.class))).thenReturn(List.of(policy));
+                Attribute attribute = Attribute.builder().id(new AttributeId("role")).source(Attribute.Source.SUBJECT).build();
+                when(attributeProvider.getAttribute(new AttributeId("role"))).thenReturn(attribute);
+
+                // when
+                boolean result = evaluator.canAccess(new SubjectId("subject1"), new ResourceId("resource1"), Action.READ);
 
                 // then
                 assertThat(result).isFalse();
         }
 
         private Context createTestContext() {
-                Map<String, Object> subjectAttributes = new HashMap<>();
-                subjectAttributes.put("role", "USER");
+                Map<AttributeId, AttributeValue> subjectAttributes = new HashMap<>();
+                subjectAttributes.put(new AttributeId("role"), new AttributeValue("USER"));
 
-                Map<String, Object> resourceAttributes = new HashMap<>();
-                resourceAttributes.put("type", "Document");
+                Map<AttributeId, AttributeValue> resourceAttributes = new HashMap<>();
+                resourceAttributes.put(new AttributeId("type"), new AttributeValue("Document"));
 
-                Map<String, Object> environmentAttributes = new HashMap<>();
-                environmentAttributes.put("timezone", "UTC");
+                Map<AttributeId, AttributeValue> environmentAttributes = new HashMap<>();
+                environmentAttributes.put(new AttributeId("timezone"), new AttributeValue("UTC"));
 
                 return Context.builder()
                                 .subject(Context.Subject.builder()
-                                                .id("subject1")
+                                                .id(new SubjectId("subject1"))
                                                 .type("User")
                                                 .attributes(subjectAttributes)
                                                 .build())
                                 .resource(Context.Resource.builder()
-                                                .id("resource1")
+                                                .id(new ResourceId("resource1"))
                                                 .type("Document")
                                                 .attributes(resourceAttributes)
                                                 .build())
@@ -188,23 +315,23 @@ class DefaultPolicyEvaluatorTest {
         }
 
         private Context createTestContextWithRole(String role) {
-                Map<String, Object> subjectAttributes = new HashMap<>();
-                subjectAttributes.put("role", role);
+                Map<AttributeId, AttributeValue> subjectAttributes = new HashMap<>();
+                subjectAttributes.put(new AttributeId("role"), new AttributeValue(role));
 
-                Map<String, Object> resourceAttributes = new HashMap<>();
-                resourceAttributes.put("type", "Document");
+                Map<AttributeId, AttributeValue> resourceAttributes = new HashMap<>();
+                resourceAttributes.put(new AttributeId("type"), new AttributeValue("Document"));
 
-                Map<String, Object> environmentAttributes = new HashMap<>();
-                environmentAttributes.put("timezone", "UTC");
+                Map<AttributeId, AttributeValue> environmentAttributes = new HashMap<>();
+                environmentAttributes.put(new AttributeId("timezone"), new AttributeValue("UTC"));
 
                 return Context.builder()
                                 .subject(Context.Subject.builder()
-                                                .id("subject1")
+                                                .id(new SubjectId("subject1"))
                                                 .type("User")
                                                 .attributes(subjectAttributes)
                                                 .build())
                                 .resource(Context.Resource.builder()
-                                                .id("resource1")
+                                                .id(new ResourceId("resource1"))
                                                 .type("Document")
                                                 .attributes(resourceAttributes)
                                                 .build())

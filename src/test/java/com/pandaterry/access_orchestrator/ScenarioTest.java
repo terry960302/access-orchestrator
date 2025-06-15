@@ -2,15 +2,20 @@ package com.pandaterry.access_orchestrator;
 
 import com.pandaterry.access_orchestrator.core.attribute.Attribute;
 import com.pandaterry.access_orchestrator.core.attribute.DefaultAttributeProvider;
+import com.pandaterry.access_orchestrator.core.attribute.AttributeId;
+import com.pandaterry.access_orchestrator.core.attribute.AttributeValue;
 import com.pandaterry.access_orchestrator.core.context.Context;
 import com.pandaterry.access_orchestrator.core.context.DefaultContextManager;
 import com.pandaterry.access_orchestrator.core.policy.*;
+import com.pandaterry.access_orchestrator.core.resource.FieldName;
+import com.pandaterry.access_orchestrator.core.resource.SubjectId;
+import com.pandaterry.access_orchestrator.core.resource.ResourceId;
+import com.pandaterry.access_orchestrator.core.resource.Action;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
 import java.util.HashMap;
 import java.util.List;
@@ -40,82 +45,81 @@ class ScenarioTest {
         private void setupAttributes() {
                 // 역할 속성
                 Attribute roleAttribute = Attribute.builder()
-                                .id("role")
+                                .id(new AttributeId("role"))
                                 .name("Role")
                                 .source(Attribute.Source.SUBJECT)
                                 .dataType(Attribute.DataType.STRING)
                                 .build();
-                attributeProvider.setAttribute("role", roleAttribute);
+                attributeProvider.setAttribute(new AttributeId("role"), roleAttribute);
 
                 // 직책 속성
                 Attribute titleAttribute = Attribute.builder()
-                                .id("title")
+                                .id(new AttributeId("title"))
                                 .name("Title")
                                 .source(Attribute.Source.SUBJECT)
                                 .dataType(Attribute.DataType.STRING)
                                 .build();
-                attributeProvider.setAttribute("title", titleAttribute);
+                attributeProvider.setAttribute(new AttributeId("title"), titleAttribute);
 
                 // 도메인 속성
                 Attribute domainAttribute = Attribute.builder()
-                                .id("domain")
+                                .id(new AttributeId("domain"))
                                 .name("Domain")
                                 .source(Attribute.Source.SUBJECT)
                                 .dataType(Attribute.DataType.STRING)
                                 .build();
-                attributeProvider.setAttribute("domain", domainAttribute);
+                attributeProvider.setAttribute(new AttributeId("domain"), domainAttribute);
 
                 // 가시성 속성
                 Attribute visibilityAttribute = Attribute.builder()
-                                .id("visibility")
+                                .id(new AttributeId("visibility"))
                                 .name("Visibility")
                                 .source(Attribute.Source.RESOURCE)
                                 .dataType(Attribute.DataType.STRING)
                                 .build();
-                attributeProvider.setAttribute("visibility", visibilityAttribute);
+                attributeProvider.setAttribute(new AttributeId("visibility"), visibilityAttribute);
 
                 // 상태 속성
                 Attribute stateAttribute = Attribute.builder()
-                                .id("state")
+                                .id(new AttributeId("state"))
                                 .name("State")
                                 .source(Attribute.Source.RESOURCE)
                                 .dataType(Attribute.DataType.STRING)
                                 .build();
-                attributeProvider.setAttribute("state", stateAttribute);
+                attributeProvider.setAttribute(new AttributeId("state"), stateAttribute);
         }
 
         private void setupFieldPolicies() {
                 // 예산 필드 정책
                 FieldPolicy budgetPolicy = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("budget")
+                                .fieldName(new FieldName("budget"))
                                 .conditions(List.of(
                                                 Condition.builder()
-                                                                .attributeId("title")
+                                                                .attributeId(new AttributeId("title"))
                                                                 .operator(Condition.Operator.EQUALS)
                                                                 .value("PM")
                                                                 .build(),
                                                 Condition.builder()
-                                                                .attributeId("domain")
+                                                                .attributeId(new AttributeId("domain"))
                                                                 .operator(Condition.Operator.EQUALS)
                                                                 .value("FINANCE")
                                                                 .build()))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 fieldPolicyManager.addFieldPolicy(budgetPolicy);
-                System.out.println("Budget policy effect: " + budgetPolicy.getEffect());
 
                 // 댓글 가시성 정책
                 FieldPolicy commentVisibilityPolicy = FieldPolicy.builder()
                                 .resourceType("Comment")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .conditions(List.of(
                                                 Condition.builder()
-                                                                .attributeId("visibility")
+                                                                .attributeId(new AttributeId("visibility"))
                                                                 .operator(Condition.Operator.EQUALS)
                                                                 .value("PRIVATE")
                                                                 .build()))
-                                .effect(Policy.Effect.ALLOW)
+                                .effect(Policy.Effect.DENY)
                                 .build();
                 fieldPolicyManager.addFieldPolicy(commentVisibilityPolicy);
         }
@@ -124,41 +128,39 @@ class ScenarioTest {
         @DisplayName("PM 역할의 사용자가 Document의 budget 필드에 접근할 때, 모든 조건을 만족하면 접근이 허용되어야 한다")
         void scenario1_DocumentBudgetFieldAccess() {
                 // given
-                Map<String, Object> pmAttributes = new HashMap<>();
-                pmAttributes.put("role", "PM");
-                pmAttributes.put("title", "PM");
-                pmAttributes.put("domain", "FINANCE");
+                Map<AttributeId, AttributeValue> pmAttributes = new HashMap<>();
+                pmAttributes.put(new AttributeId("role"), new AttributeValue("PM"));
+                pmAttributes.put(new AttributeId("title"), new AttributeValue("PM"));
+                pmAttributes.put(new AttributeId("domain"), new AttributeValue("FINANCE"));
 
-                System.out.println("PM attributes: " + pmAttributes); // PM 속성 출력
 
-                Map<String, Object> documentAttributes = new HashMap<>();
-                documentAttributes.put("type", "Document");
+                Map<AttributeId, AttributeValue> documentAttributes = new HashMap<>();
+                documentAttributes.put(new AttributeId("type"), new AttributeValue("Document"));
 
                 Context pmContext = Context.builder()
                                 .subject(Context.Subject.builder()
-                                                .id("pm1")
+                                                .id(new SubjectId("pm1"))
                                                 .type("User")
                                                 .attributes(pmAttributes)
                                                 .build())
                                 .resource(Context.Resource.builder()
-                                                .id("doc1")
+                                                .id(new ResourceId("doc1"))
                                                 .type("Document")
                                                 .attributes(documentAttributes)
                                                 .build())
                                 .environment(Context.Environment.builder()
                                                 .id("env1")
                                                 .type("System")
-                                                .attributes(new HashMap<>())
+                                                .attributes(new HashMap<AttributeId, AttributeValue>())
                                                 .build())
                                 .build();
 
-                contextManager.updateContext("pm1", pmContext);
+                contextManager.updateContext(new SubjectId("pm1"), new ResourceId("doc1"), Action.READ, pmContext);
 
                 // when
-                boolean canAccessBudget = evaluator.canAccessField("pm1", "doc1", "budget");
+                boolean canAccessBudget = evaluator.canAccessField(new SubjectId("pm1"), new ResourceId("doc1"), new FieldName("budget"));
 
                 // then
-                System.out.println("Can access budget: " + canAccessBudget); // 접근 가능 여부 출력
                 assertThat(canAccessBudget).isTrue();
         }
 
@@ -166,34 +168,34 @@ class ScenarioTest {
         @DisplayName("visibility가 PRIVATE인 댓글에 일반 사용자가 접근할 때, 접근이 거부되어야 한다")
         void scenario2_PrivateCommentAccess() {
                 // given
-                Map<String, Object> subjectAttributes = new HashMap<>();
-                subjectAttributes.put("role", "USER");
+                Map<AttributeId, AttributeValue> subjectAttributes = new HashMap<>();
+                subjectAttributes.put(new AttributeId("role"), new AttributeValue("USER"));
 
-                Map<String, Object> resourceAttributes = new HashMap<>();
-                resourceAttributes.put("visibility", "PRIVATE");
+                Map<AttributeId, AttributeValue> resourceAttributes = new HashMap<>();
+                resourceAttributes.put(new AttributeId("visibility"), new AttributeValue("PRIVATE"));
 
                 Context context = Context.builder()
                                 .subject(Context.Subject.builder()
-                                                .id("user1")
+                                                .id(new SubjectId("user1"))
                                                 .type("User")
                                                 .attributes(subjectAttributes)
                                                 .build())
                                 .resource(Context.Resource.builder()
-                                                .id("comment1")
+                                                .id(new ResourceId("comment1"))
                                                 .type("Comment")
                                                 .attributes(resourceAttributes)
                                                 .build())
                                 .environment(Context.Environment.builder()
                                                 .id("env1")
                                                 .type("System")
-                                                .attributes(new HashMap<>())
+                                                .attributes(new HashMap<AttributeId, AttributeValue>())
                                                 .build())
                                 .build();
 
-                contextManager.updateContext("user1", context);
+                contextManager.updateContext(new SubjectId("user1"), new ResourceId("comment1"), Action.READ, context);
 
                 // when
-                boolean canAccessComment = evaluator.canAccessField("user1", "comment1", "content");
+                boolean canAccessComment = evaluator.canAccessField(new SubjectId("user1"), new ResourceId("comment1"), new FieldName("content"));
 
                 // then
                 assertThat(canAccessComment).isFalse();
@@ -207,30 +209,30 @@ class ScenarioTest {
                                 .effect(Policy.Effect.ALLOW)
                                 .conditions(List.of(
                                                 Condition.builder()
-                                                                .attributeId("state")
+                                                                .attributeId(new AttributeId("state"))
                                                                 .operator(Condition.Operator.NOT_EQUALS)
                                                                 .value("APPROVED")
                                                                 .build()))
                                 .build();
 
-                Map<String, Object> resourceAttributes = new HashMap<>();
-                resourceAttributes.put("state", "APPROVED");
+                Map<AttributeId, AttributeValue> resourceAttributes = new HashMap<>();
+                resourceAttributes.put(new AttributeId("state"), new AttributeValue("APPROVED"));
 
                 Context context = Context.builder()
                                 .subject(Context.Subject.builder()
-                                                .id("user1")
+                                                .id(new SubjectId("user1"))
                                                 .type("User")
-                                                .attributes(new HashMap<>())
+                                                .attributes(new HashMap<AttributeId, AttributeValue>())
                                                 .build())
                                 .resource(Context.Resource.builder()
-                                                .id("doc1")
+                                                .id(new ResourceId("doc1"))
                                                 .type("Document")
                                                 .attributes(resourceAttributes)
                                                 .build())
                                 .environment(Context.Environment.builder()
                                                 .id("env1")
                                                 .type("System")
-                                                .attributes(new HashMap<>())
+                                                .attributes(new HashMap<AttributeId, AttributeValue>())
                                                 .build())
                                 .build();
 

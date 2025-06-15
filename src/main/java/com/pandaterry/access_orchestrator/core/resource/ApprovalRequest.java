@@ -9,11 +9,11 @@ import java.util.Map;
 @Getter
 @Builder
 public class ApprovalRequest {
-    private final String id;
-    private final String resourceId;
+    private final ApprovalRequestId id;
+    private final ResourceId resourceId;
     private final String resourceType;
-    private final String requesterId;
-    private final String approverId;
+    private final SubjectId requesterId;
+    private final SubjectId approverId;
     private final String state;
     private final Map<String, Object> metadata;
     private final LocalDateTime createdAt;

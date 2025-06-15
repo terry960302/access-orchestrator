@@ -1,59 +1,53 @@
 package com.pandaterry.access_orchestrator.core.context;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+
+import com.pandaterry.access_orchestrator.core.resource.SubjectId;
+import com.pandaterry.access_orchestrator.core.resource.ResourceId;
+import com.pandaterry.access_orchestrator.core.resource.Action;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashMap;
 
-@Component
-@RequiredArgsConstructor
+import com.pandaterry.access_orchestrator.core.attribute.AttributeId;
+import com.pandaterry.access_orchestrator.core.attribute.AttributeValue;
+
 public class DefaultContextManager implements ContextManager {
     private final Map<String, Context> contextCache = new ConcurrentHashMap<>();
 
     @Override
-    public Context getContext(String subjectId, String resourceId, String action) {
-        String key = generateKey(subjectId, resourceId, action);
-        return contextCache.computeIfAbsent(key, k -> buildContext(subjectId, resourceId, action));
+    public Context getContext(SubjectId subjectId, ResourceId resourceId, Action action) {
+        String key = generateKey(subjectId.value(), resourceId.value(), action);
+        return contextCache.computeIfAbsent(key, k -> buildContext(subjectId, resourceId));
     }
 
     @Override
-    public void updateContext(String subjectId, Context context) {
-        // subjectId, resourceId, action을 모두 포함하는 key로 저장해야 함
-        // 테스트에서는 resourceId/action이 고정이므로, 모든 조합에 대해 저장
-        // 여기서는 resourceId/action을 context에서 추출할 수 없으므로, subjectId만으로 저장
-        // 실제 서비스에서는 더 정교하게 구현 필요
-        // 일단 테스트 목적상 subjectId로 시작하는 모든 key를 삭제 후, 새로운 context를 저장
-        contextCache.entrySet().removeIf(entry -> entry.getKey().startsWith(subjectId + ":"));
-        // 예시: "subject1:resource1:read" 등으로 저장
-        // 테스트에서 사용하는 resourceId/action 조합을 미리 알 수 없으므로, 가장 단순하게 저장
-        // 실제로는 테스트에서 updateContext 후 바로 getContext를 호출하므로, 아래와 같이 저장
-        String key = generateKey(subjectId, "resource1", "read");
+    public void updateContext(SubjectId subjectId, ResourceId resourceId, Action action, Context context) {
+        String key = generateKey(subjectId.value(), resourceId.value(), action);
         contextCache.put(key, context);
     }
 
     @Override
-    public void clearContext(String subjectId) {
-        contextCache.entrySet().removeIf(entry -> entry.getKey().startsWith(subjectId + ":"));
+    public void clearContext(SubjectId subjectId) {
+        contextCache.entrySet().removeIf(entry -> entry.getKey().startsWith(subjectId.value() + ":"));
     }
 
-    private String generateKey(String subjectId, String resourceId, String action) {
-        return String.format("%s:%s:%s", subjectId, resourceId, action);
+    private String generateKey(String subjectId, String resourceId, Action action) {
+        return String.format("%s:%s:%s", subjectId, resourceId, action.name().toLowerCase());
     }
 
-    private Context buildContext(String subjectId, String resourceId, String action) {
+    private Context buildContext(SubjectId subjectId, ResourceId resourceId) {
         // 테스트를 위한 기본 Context 생성
-        Map<String, Object> subjectAttributes = new HashMap<>();
-        subjectAttributes.put("role", "PM");
-        subjectAttributes.put("domain", "FINANCE");
-        subjectAttributes.put("title", "PM");
+        Map<AttributeId, AttributeValue> subjectAttributes = new HashMap<>();
+        subjectAttributes.put(new AttributeId("role"), new AttributeValue("PM"));
+        subjectAttributes.put(new AttributeId("domain"), new AttributeValue("FINANCE"));
+        subjectAttributes.put(new AttributeId("title"), new AttributeValue("PM"));
 
-        Map<String, Object> resourceAttributes = new HashMap<>();
-        resourceAttributes.put("type", "Document");
+        Map<AttributeId, AttributeValue> resourceAttributes = new HashMap<>();
+        resourceAttributes.put(new AttributeId("type"), new AttributeValue("Document"));
 
-        Map<String, Object> environmentAttributes = new HashMap<>();
-        environmentAttributes.put("timezone", "UTC");
+        Map<AttributeId, AttributeValue> environmentAttributes = new HashMap<>();
+        environmentAttributes.put(new AttributeId("timezone"), new AttributeValue("UTC"));
 
         return Context.builder()
                 .subject(Context.Subject.builder()

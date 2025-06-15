@@ -2,12 +2,14 @@ package com.pandaterry.access_orchestrator.core.attribute;
 
 import java.util.Map;
 
+import com.pandaterry.access_orchestrator.core.resource.SubjectId;
+
 public interface AttributeProvider {
-    Attribute getAttribute(String id);
+    Attribute getAttribute(AttributeId id);
 
-    Map<String, Attribute> getAttributes(String subjectId);
+    Map<AttributeId, Attribute> getAttributes(SubjectId subjectId);
 
-    void setAttribute(String id, Attribute attribute);
+    void setAttribute(AttributeId id, Attribute attribute);
 
-    void removeAttribute(String id);
+    void removeAttribute(AttributeId id);
 }

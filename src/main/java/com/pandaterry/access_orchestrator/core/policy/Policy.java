@@ -9,15 +9,10 @@ import java.util.List;
 @Builder
 public class Policy {
     private final String id;
-    private final PolicyType type;
     private final int priority;
     private final List<Condition> conditions;
     private final Effect effect;
 
-    public enum PolicyType {
-        ALLOW,
-        DENY
-    }
 
     public enum Effect {
         ALLOW,

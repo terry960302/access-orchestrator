@@ -3,12 +3,19 @@ package com.pandaterry.access_orchestrator;
 import com.pandaterry.access_orchestrator.core.policy.DefaultFieldPolicyManager;
 import com.pandaterry.access_orchestrator.core.policy.FieldPolicy;
 import com.pandaterry.access_orchestrator.core.policy.Policy;
+import com.pandaterry.access_orchestrator.core.resource.FieldName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,7 +33,7 @@ class DefaultFieldPolicyManagerTest {
                 // given
                 FieldPolicy policy = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
 
@@ -45,13 +52,13 @@ class DefaultFieldPolicyManagerTest {
                 // given
                 FieldPolicy policy = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 manager.addFieldPolicy(policy);
 
                 // when
-                manager.removeFieldPolicy("Document", "content");
+                manager.removeFieldPolicy("Document", new FieldName("content"));
 
                 // then
                 List<FieldPolicy> policies = manager.getFieldPolicies("Document");
@@ -64,13 +71,13 @@ class DefaultFieldPolicyManagerTest {
                 // given
                 FieldPolicy policy = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 manager.addFieldPolicy(policy);
 
                 // when
-                FieldPolicy result = manager.getFieldPolicy("Document", "content");
+                FieldPolicy result = manager.getFieldPolicy("Document", new FieldName("content"));
 
                 // then
                 assertThat(result).isEqualTo(policy);
@@ -82,12 +89,12 @@ class DefaultFieldPolicyManagerTest {
                 // given
                 FieldPolicy policy1 = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 FieldPolicy policy2 = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("title")
+                                .fieldName(new FieldName("title"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 manager.addFieldPolicy(policy1);
@@ -107,12 +114,12 @@ class DefaultFieldPolicyManagerTest {
                 // given
                 FieldPolicy policy1 = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 FieldPolicy policy2 = FieldPolicy.builder()
                                 .resourceType("Asset")
-                                .fieldName("url")
+                                .fieldName(new FieldName("url"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 manager.addFieldPolicy(policy1);
@@ -132,12 +139,12 @@ class DefaultFieldPolicyManagerTest {
                 // given
                 FieldPolicy policy1 = FieldPolicy.builder()
                                 .resourceType("Document")
-                                .fieldName("content")
+                                .fieldName(new FieldName("content"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 FieldPolicy policy2 = FieldPolicy.builder()
                                 .resourceType("Asset")
-                                .fieldName("url")
+                                .fieldName(new FieldName("url"))
                                 .effect(Policy.Effect.ALLOW)
                                 .build();
                 manager.addFieldPolicy(policy1);
@@ -149,5 +156,34 @@ class DefaultFieldPolicyManagerTest {
                 // then
                 Map<String, List<FieldPolicy>> allPolicies = manager.getAllFieldPolicies();
                 assertThat(allPolicies).isEmpty();
+        }
+
+        @Test
+        @DisplayName("여러 스레드가 동시에 정책을 추가/삭제해도 예외가 발생하지 않아야 한다")
+        void concurrentModification_ShouldNotThrowException() throws Exception {
+                int threadCount = 10;
+                ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+                List<Callable<Void>> tasks = new ArrayList<>();
+
+                for (int i = 0; i < threadCount; i++) {
+                        final int idx = i;
+                        tasks.add(() -> {
+                                FieldPolicy policy = FieldPolicy.builder()
+                                                .resourceType("Document")
+                                                .fieldName(new FieldName("field" + idx))
+                                                .effect(Policy.Effect.ALLOW)
+                                                .build();
+                                manager.addFieldPolicy(policy);
+                                manager.removeFieldPolicy("Document", new FieldName("field" + idx));
+                                return null;
+                        });
+                }
+
+                List<Future<Void>> futures = executor.invokeAll(tasks);
+                for (Future<Void> f : futures) {
+                        f.get();
+                }
+                executor.shutdown();
+                executor.awaitTermination(5, TimeUnit.SECONDS);
         }
 }
